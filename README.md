@@ -21,31 +21,6 @@ Caching a single AI response saves money but kills diversity. Not caching at all
 
 <img src="https://mermaid.ink/img/Zmxvd2NoYXJ0IFRECiAgICBBWyJSZXF1ZXN0OiBrZXk9J2ZvcnR1bmU6bG92ZSciXSAtLT4gQntDYWNoZSBleGlzdHM_fQogICAgQiAtLT58Tm98IENbQ2FsbCBBSSBBUEkgfjE0LTQwc10KICAgIEMgLS0-IERbU3RvcmUgUmVzcG9uc2UgQSBpbiBwb29sXQogICAgRCAtLT4gRVtSZXR1cm4gQV0KICAgIEIgLS0-fFllc3wgRntQb29sIG1vZGU_fQogICAgRiAtLT58U2ltcGxlfCBHW1JldHVybiBjYWNoZWQgdmFsdWUgfjVtc10KICAgIEYgLS0-fFBvb2x8IEh7TmV3ZXN0IGVudHJ5IGhpdHMgPj0gTj99CiAgICBIIC0tPnxOb3wgSVtSYW5kb20gcGljayBmcm9tIHBvb2wgfjVtc10KICAgIEkgLS0-IEpbUmV0dXJuIHJhbmRvbSByZXNwb25zZV0KICAgIEggLS0-fFllc3wgS1tSYW5kb20gcGljayBmcm9tIHBvb2wgfjVtc10KICAgIEsgLS0-IExbUmV0dXJuIHJlc3BvbnNlIHRvIGNhbGxlcl0KICAgIEsgLS0-IE1bVHJpZ2dlciBvbkdyb3d0aCBjYWxsYmFjayBhc3luY10KICAgIE0gLS0-IE5bQ2FsbGVyIGdlbmVyYXRlcyBuZXcgcmVzcG9uc2VdCiAgICBOIC0tPiBPW1Jlc3BvbnNlIEIgYWRkZWQgdG8gcG9vbF0KICAgIE8gLS0-IFBbUG9vbCBzaXplOiAyXQogICAgUCAtLT4gUVtGdXR1cmUgcmVxdWVzdHM6IHJhbmRvbSBBIG9yIEJdCiAgICBRIC0tPiBSW0IgcmVhY2hlcyBOIGhpdHMuLi5dCiAgICBSIC0tPiBTW0dlbmVyYXRlIEMsIHBvb2wgc2l6ZTogM10KICAgIFMgLS0-IFRbR3Jvd3RoIG5hdHVyYWxseSBkZWNlbGVyYXRlc10=" alt="How It Works - Flow Diagram" />
 
-<!-- mermaid source:
-```mermaid
-flowchart TD
-    A[Request: key='fortune:love'] --> B{Cache exists?}
-    B -->|No| C[Call AI API ~14-40s]
-    C --> D[Store Response A in pool]
-    D --> E[Return A]
-    B -->|Yes| F{Pool mode?}
-    F -->|Simple| G[Return cached value ~5ms]
-    F -->|Pool| H{Newest entry hits >= N?}
-    H -->|No| I[Random pick from pool ~5ms]
-    I --> J[Return random response]
-    H -->|Yes| K[Random pick from pool ~5ms]
-    K --> L[Return response to caller]
-    K --> M[Trigger onGrowth callback async]
-    M --> N[Caller generates new response]
-    N --> O[Response B added to pool]
-    O --> P[Pool size: 2]
-    P --> Q[Future requests: random A or B]
-    Q --> R[B reaches N hits...]
-    R --> S[Generate C, pool size: 3]
-    S --> T[Growth naturally decelerates]
-```
--->
-
 ### The Growth Cycle
 
 1. **Cache miss** -- Call AI, store Response A in pool (`hit_count=0`)
@@ -75,32 +50,11 @@ The pool self-regulates: high-traffic keys get more diversity, low-traffic keys 
 
 <img src="https://mermaid.ink/img/eHljaGFydC1iZXRhCiAgICB0aXRsZSAiUG9vbCBTaXplIEdyb3d0aCBPdmVyIFJlcXVlc3RzIgogICAgeC1heGlzICJUb3RhbCBSZXF1ZXN0cyIgWzAsIDMsIDksIDE4LCAzMCwgNDUsIDYzLCA4NCwgMTA4LCAxMzVdCiAgICB5LWF4aXMgIlBvb2wgU2l6ZSIgMCAtLT4gMTIKICAgIGxpbmUgWzAsIDEsIDIsIDMsIDQsIDUsIDYsIDcsIDgsIDld" alt="Pool Size Growth Over Requests" />
 
-<!-- mermaid source:
-```mermaid
-xychart-beta
-    title "Pool Size Growth Over Requests"
-    x-axis "Total Requests" [0, 3, 9, 18, 30, 45, 63, 84, 108, 135]
-    y-axis "Pool Size" 0 --> 12
-    line [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-```
--->
-
 > Pool growth follows **O(√n)** — rapid early growth, then gradual deceleration. No configuration needed.
 
 #### Cumulative AI Calls vs Requests Served
 
 <img src="https://mermaid.ink/img/eHljaGFydC1iZXRhCiAgICB0aXRsZSAiQUkgQVBJIENhbGxzIFNhdmVkIE92ZXIgVGltZSIKICAgIHgtYXhpcyAiVG90YWwgUmVxdWVzdHMgU2VydmVkIiBbMCwgMTAsIDMwLCA2MCwgMTAwLCAyMDAsIDUwMCwgMTAwMF0KICAgIHktYXhpcyAiQUkgQVBJIENhbGxzIE1hZGUiIDAgLS0-IDMwCiAgICBsaW5lICJHcm93aW5nIFBvb2wiIFswLCAzLCA1LCA4LCAxMSwgMTUsIDIyLCAzMF0KICAgIGxpbmUgIk5vIENhY2hlIiBbMCwgMTAsIDMwLCA2MCwgMTAwLCAyMDAsIDUwMCwgMTAwMF0=" alt="AI API Calls Saved Over Time" />
-
-<!-- mermaid source:
-```mermaid
-xychart-beta
-    title "AI API Calls Saved Over Time"
-    x-axis "Total Requests Served" [0, 10, 30, 60, 100, 200, 500, 1000]
-    y-axis "AI API Calls Made" 0 --> 30
-    line "Growing Pool" [0, 3, 5, 8, 11, 15, 22, 30]
-    line "No Cache" [0, 10, 30, 60, 100, 200, 500, 1000]
-```
--->
 
 > At 1,000 requests, Growing Pool Cache uses **~30 AI calls** vs 1,000 without cache. **97% cost reduction** while maintaining diverse responses.
 
@@ -108,29 +62,12 @@ xychart-beta
 
 <img src="https://mermaid.ink/img/eHljaGFydC1iZXRhCiAgICB0aXRsZSAiQ2FjaGUgSGl0IFJhdGUgKCUpIgogICAgeC1heGlzICJUb3RhbCBSZXF1ZXN0cyIgWzEsIDUsIDEwLCAyMCwgNTAsIDEwMCwgNTAwLCAxMDAwXQogICAgeS1heGlzICJIaXQgUmF0ZSAlIiAwIC0tPiAxMDAKICAgIGxpbmUgWzAsIDYwLCA4MCwgOTAsIDk0LCA5NywgOTksIDk5XQ==" alt="Cache Hit Rate Over Time" />
 
-<!-- mermaid source:
-```mermaid
-xychart-beta
-    title "Cache Hit Rate (%)"
-    x-axis "Total Requests" [1, 5, 10, 20, 50, 100, 500, 1000]
-    y-axis "Hit Rate %" 0 --> 100
-    line [0, 60, 80, 90, 94, 97, 99, 99]
-```
--->
-
 > Hit rate converges to **~99%** as pool grows. Every hit returns in **~5ms** vs **14-40 seconds** for AI generation.
 
 #### Response Latency Distribution
 
 <img src="https://mermaid.ink/img/cGllIHRpdGxlIFJlc3BvbnNlIExhdGVuY3kgKGFmdGVyIDEwMCByZXF1ZXN0cywgcG9vbFRhcmdldD0zKQogICAgIn41bXMgKGNhY2hlIGhpdCkiIDogOTcKICAgICIxNC00MHMgKEFJIGdlbmVyYXRpb24pIiA6IDM=" alt="Response Latency Distribution" />
 
-<!-- mermaid source:
-```mermaid
-pie title Response Latency (after 100 requests, poolTarget=3)
-    "~5ms (cache hit)" : 97
-    "14-40s (AI generation)" : 3
-```
--->
 
 ## Traditional Cache vs Growing Pool Cache
 
