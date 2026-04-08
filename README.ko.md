@@ -33,23 +33,24 @@ flowchart TD
     H -->|No| I["풀에서 랜덤 선택 ~5ms"]
     I --> J[랜덤 응답 반환]
     
-    H -->|Yes| K[성장 트리거]
-    K --> L["null 반환 (호출자에게)"]
-    L --> M[호출자가 새 응답 생성]
-    M --> N[응답 B가 풀에 추가]
-    N --> O["풀 크기: 2"]
+    H -->|Yes| K["풀에서 랜덤 선택 ~5ms"]
+    K --> L[응답 반환]
+    K --> M["onGrowth 콜백 비동기 트리거"]
+    M --> N[호출자가 새 응답 생성]
+    N --> O[응답 B가 풀에 추가]
+    O --> P["풀 크기: 2"]
     
-    O --> P["향후 요청: 랜덤으로 A 또는 B"]
-    P --> Q["B가 N 히트 도달..."]
-    Q --> R["C 생성, 풀 크기: 3"]
-    R --> S[성장이 자연스럽게 감속]
+    P --> Q["향후 요청: 랜덤으로 A 또는 B"]
+    Q --> R["B가 N 히트 도달..."]
+    R --> S["C 생성, 풀 크기: 3"]
+    S --> T[성장이 자연스럽게 감속]
 ```
 
 ### 성장 사이클
 
 1. **캐시 미스** -- AI 호출, 응답 A를 풀에 저장 (`hit_count=0`)
 2. **캐시 히트** -- A 반환, 히트 카운트 증가
-3. **A가 N 히트 도달** -- 성장 트리거 (`is_growing=true`), `null` 반환하여 호출자가 새 콘텐츠 생성
+3. **A가 N 히트 도달** -- 응답은 정상 반환하면서, `onGrowth` 콜백을 비동기로 트리거하여 백그라운드에서 새 콘텐츠 생성
 4. **새 응답 B 저장** -- 풀 크기 2, `is_growing=false`
 5. **향후 요청** -- 풀에서 랜덤 선택 (A 또는 B)
 6. **B가 N 히트 도달** -- C 생성... 풀이 성장하지만, 히트가 더 많은 항목에 분산되면서 성장이 자연스럽게 **감속**
@@ -102,8 +103,10 @@ await cache.set('fortune:love', '오늘 좋은 일이 생길 거예요!', { pool
 // 처음 3번은 같은 응답 반환
 await cache.get('fortune:love'); // '오늘 좋은 일이 생길 거예요!'
 
-// 3번 히트 후, null 반환 → 새 응답 생성 & 저장
-const result = await cache.get('fortune:love'); // null (성장 트리거)
+// 3번 히트 후, onGrowth 콜백 발생 — 응답은 정상 반환
+await cache.get('fortune:love'); // '오늘 좋은 일이 생길 거예요!' + onGrowth 콜백 트리거
+
+// onGrowth 콜백에서 새 AI 응답 생성 후 풀에 추가
 await cache.set('fortune:love', '사랑이 가득한 하루가 될 거예요!', { poolTarget: 3 });
 
 // 이제 두 응답 중 랜덤으로 반환
@@ -122,10 +125,10 @@ await cache.get('fortune:love'); // 둘 중 하나
 
 ### `cache.get(key)`
 
-캐시된 값을 반환하거나, 미스/성장 트리거 시 `null`을 반환합니다.
+캐시된 값을 반환하거나, 미스 시 `null`을 반환합니다.
 
 - **Simple 모드**: 저장된 값 반환
-- **Pool 모드**: 풀에서 랜덤 값 반환, 또는 성장 트리거 시 `null`
+- **Pool 모드**: 풀에서 랜덤 값 반환. 최신 항목이 `poolTarget` 히트에 도달하면 `onGrowth` 콜백이 비동기로 트리거됩니다 — 응답은 항상 정상 반환됩니다.
 
 ### `cache.set(key, value, options?)`
 
@@ -242,18 +245,26 @@ class MyAdapter {
 
 ```javascript
 // 캐시 키 = 운세 카테고리 + 사용자 생년 데이터
+const cache = new GrowingPoolCache(adapter, {
+  onGrowth: async (key) => {
+    // 백그라운드에서 새 변형 생성
+    const fortune = await openai.chat.completions.create({ ... });
+    await cache.set(key, fortune, { poolTarget: 3, ttl: 86400 });
+  },
+});
+
 const key = `fortune:${category}:${birthYear}`;
-const cached = await cache.get(key);
+const cached = await cache.get(key); // ~5ms, 필요 시 onGrowth도 트리거
 
-if (cached) return cached; // ~5ms
+if (cached) return cached;
 
-// 캐시 미스 또는 성장 트리거
+// 캐시 미스 (최초 요청) — 생성 후 저장
 const fortune = await openai.chat.completions.create({ ... }); // 14-40초
 await cache.set(key, fortune, { poolTarget: 3, ttl: 86400 });
 return fortune;
 ```
 
-**결과**: 첫 사용자는 14-40초 대기. 이후 사용자는 즉시 응답. 3번 히트마다 새로운 변형이 생성됩니다. 같은 생년 데이터를 가진 사용자들도 서로 다른 운세를 봅니다.
+**결과**: 첫 사용자는 14-40초 대기. 이후 모든 사용자는 즉시 응답 (~5ms). 3번 히트마다 새로운 변형이 백그라운드에서 생성되어 아무도 대기하지 않습니다. 같은 생년 데이터를 가진 사용자들도 서로 다른 운세를 봅니다.
 
 ### 챗봇 인사 메시지
 

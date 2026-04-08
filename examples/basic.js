@@ -38,12 +38,12 @@ async function main() {
     await new Promise((r) => setTimeout(r, 10)); // let fire-and-forget complete
   }
 
-  // 4th get: newest entry has 3+ hits → triggers growth → returns null
-  console.log('\n4th request triggers growth:');
-  const shouldBeNull = await cache.get('fortune:general');
-  console.log(`  Result: ${shouldBeNull} (null = generate new AI response)`);
+  // 4th get: newest entry has 3+ hits → triggers growth + still returns response
+  console.log('\n4th request triggers growth (onGrowth callback fires):');
+  const stillReturnsValue = await cache.get('fortune:general');
+  console.log(`  Result: ${stillReturnsValue} (response returned + growth triggered async)`);
 
-  // Simulate: caller generates a new AI response and stores it
+  // In onGrowth callback, caller generates a new AI response and stores it
   await cache.set('fortune:general', 'Today is your lucky day!', { poolTarget: 3 });
 
   console.log('\nPool now has 2 responses. Random picks:');

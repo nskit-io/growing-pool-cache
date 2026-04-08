@@ -104,7 +104,7 @@ test('pool mode: get returns value from pool', async () => {
   assert.strictEqual(val, 'Good fortune ahead!');
 });
 
-test('pool mode: triggers growth after N hits', async () => {
+test('pool mode: triggers growth after N hits while still returning response', async () => {
   let growthTriggered = false;
   const adapter = new MemoryAdapter();
   const cache = new GrowingPoolCache(adapter, {
@@ -116,19 +116,22 @@ test('pool mode: triggers growth after N hits', async () => {
   // Hit 1
   await cache.get('fortune');
   await new Promise((r) => setTimeout(r, 10));
-  // Hit 2 - should trigger growth
+  // Hit 2 - reaches poolTarget
   await cache.get('fortune');
   await new Promise((r) => setTimeout(r, 10));
 
-  // Hit 3 - newest has hit_count >= poolTarget, triggers growth
+  // Hit 3 - newest has hit_count >= poolTarget, triggers growth BUT still returns response
   const val = await cache.get('fortune');
-  assert.strictEqual(val, null); // null = caller should generate new response
-  assert.strictEqual(growthTriggered, true);
+  assert.strictEqual(val, 'Response A'); // always returns a response
+  assert.strictEqual(growthTriggered, true); // growth triggered via onGrowth callback
 });
 
-test('pool mode: after growth, pool size increases', async () => {
+test('pool mode: after growth trigger, adding new response increases pool', async () => {
   const adapter = new MemoryAdapter();
-  const cache = new GrowingPoolCache(adapter);
+  let growthKey = null;
+  const cache = new GrowingPoolCache(adapter, {
+    onGrowth: (k) => { growthKey = k; },
+  });
 
   await cache.set('fortune', 'Response A', { poolTarget: 2 });
 
@@ -137,9 +140,11 @@ test('pool mode: after growth, pool size increases', async () => {
   await new Promise((r) => setTimeout(r, 10));
   await cache.get('fortune');
   await new Promise((r) => setTimeout(r, 10));
-  await cache.get('fortune'); // triggers growth, returns null
+  const val = await cache.get('fortune'); // triggers growth, still returns response
+  assert.strictEqual(val, 'Response A');
+  assert.strictEqual(growthKey, 'fortune');
 
-  // Add new response (simulating caller generating new AI content)
+  // Caller generates new AI content via onGrowth callback and adds to pool
   await cache.set('fortune', 'Response B', { poolTarget: 2 });
 
   const info = await cache.info('fortune');

@@ -31,12 +31,13 @@ class GrowingPoolCache {
    *
    * Simple mode: returns the stored value.
    * Pool mode: returns a random value from the pool.
-   *   - If the newest entry has reached poolTarget hits and pool is not
-   *     already growing, triggers growth (returns null so caller generates
-   *     a new response and calls set()).
+   *   - Always returns a cached response if available.
+   *   - If the newest entry has reached poolTarget hits, triggers the
+   *     onGrowth callback asynchronously so the caller can generate
+   *     a new response and add it to the pool via set().
    *
    * @param {string} key
-   * @returns {Promise<*>} Cached value, or null on miss / growth trigger
+   * @returns {Promise<*>} Cached value, or null on miss
    */
   async get(key) {
     if (!key) return null;
@@ -68,14 +69,6 @@ class GrowingPoolCache {
       return null;
     }
 
-    // Check if newest response needs growth
-    const newest = await this._adapter.getNewest(key);
-    if (newest && newest.hitCount >= meta.poolTarget && !meta.isGrowing) {
-      await this._adapter.setGrowing(key, true);
-      this._onGrowth && this._onGrowth(key);
-      return null; // Caller should generate new content and call set()
-    }
-
     // Pick random response from pool
     const pick = await this._adapter.getRandom(key);
     if (!pick) {
@@ -86,6 +79,14 @@ class GrowingPoolCache {
     // Fire-and-forget hit increments
     this._adapter.incrementPoolEntry(key, pick.id).catch(() => {});
     this._adapter.increment(key).catch(() => {});
+
+    // Check if newest response has reached growth threshold
+    // Always return the picked response — growth happens asynchronously
+    const newest = await this._adapter.getNewest(key);
+    if (newest && newest.hitCount >= meta.poolTarget && !meta.isGrowing) {
+      await this._adapter.setGrowing(key, true);
+      this._onGrowth && this._onGrowth(key);
+    }
 
     this._onHit && this._onHit(key, 'pool');
     return _deserialize(pick.response);

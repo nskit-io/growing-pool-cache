@@ -33,23 +33,24 @@ flowchart TD
     H -->|No| I[Random pick from pool ~5ms]
     I --> J[Return random response]
     
-    H -->|Yes| K[Trigger growth]
-    K --> L[Return null to caller]
-    L --> M[Caller generates new response]
-    M --> N[Response B added to pool]
-    N --> O[Pool size: 2]
+    H -->|Yes| K[Random pick from pool ~5ms]
+    K --> L[Return response to caller]
+    K --> M[Trigger onGrowth callback async]
+    M --> N[Caller generates new response]
+    N --> O[Response B added to pool]
+    O --> P[Pool size: 2]
     
-    O --> P[Future requests: random A or B]
-    P --> Q[B reaches N hits...]
-    Q --> R[Generate C, pool size: 3]
-    R --> S[Growth naturally decelerates]
+    P --> Q[Future requests: random A or B]
+    Q --> R[B reaches N hits...]
+    R --> S[Generate C, pool size: 3]
+    S --> T[Growth naturally decelerates]
 ```
 
 ### The Growth Cycle
 
 1. **Cache miss** -- Call AI, store Response A in pool (`hit_count=0`)
 2. **Cache hit** -- Return A, increment hit count
-3. **A reaches N hits** -- Trigger growth (`is_growing=true`), return `null` so caller generates new content
+3. **A reaches N hits** -- Return a response as usual, then trigger `onGrowth` callback asynchronously so caller generates new content in the background
 4. **New response B stored** -- Pool size becomes 2, `is_growing=false`
 5. **Future requests** -- Random pick from pool (A or B)
 6. **B reaches N hits** -- Generate C... the pool grows, but growth naturally **decelerates** as the random distribution spreads hits across more entries
@@ -102,8 +103,10 @@ await cache.set('fortune:love', 'Great things await!', { poolTarget: 3 });
 // First 3 hits return the same response
 await cache.get('fortune:love'); // 'Great things await!'
 
-// After 3 hits, returns null → generate & store a new response
-const result = await cache.get('fortune:love'); // null (growth triggered)
+// After 3 hits, onGrowth fires — response is still returned
+await cache.get('fortune:love'); // 'Great things await!' + onGrowth callback triggered
+
+// In onGrowth callback, generate new AI response and add to pool
 await cache.set('fortune:love', 'Love is in the air!', { poolTarget: 3 });
 
 // Now randomly returns either response
@@ -122,10 +125,10 @@ await cache.get('fortune:love'); // 'Great things await!' or 'Love is in the air
 
 ### `cache.get(key)`
 
-Returns the cached value, or `null` on miss / growth trigger.
+Returns the cached value, or `null` on miss.
 
 - **Simple mode**: returns the stored value
-- **Pool mode**: returns a random value from the pool, or `null` when growth is triggered
+- **Pool mode**: returns a random value from the pool. When the newest entry reaches `poolTarget` hits, the `onGrowth` callback is triggered asynchronously — the response is still returned to the caller.
 
 ### `cache.set(key, value, options?)`
 
@@ -242,18 +245,26 @@ See `src/adapters/memory.js` for a complete reference implementation.
 
 ```javascript
 // Cache key = fortune category + user's birth data
+const cache = new GrowingPoolCache(adapter, {
+  onGrowth: async (key) => {
+    // Generate new variation in the background
+    const fortune = await openai.chat.completions.create({ ... });
+    await cache.set(key, fortune, { poolTarget: 3, ttl: 86400 });
+  },
+});
+
 const key = `fortune:${category}:${birthYear}`;
-const cached = await cache.get(key);
+const cached = await cache.get(key); // ~5ms, also triggers onGrowth when needed
 
-if (cached) return cached; // ~5ms
+if (cached) return cached;
 
-// Cache miss or growth trigger
+// Cache miss (first request) — generate and store
 const fortune = await openai.chat.completions.create({ ... }); // 14-40s
 await cache.set(key, fortune, { poolTarget: 3, ttl: 86400 });
 return fortune;
 ```
 
-**Result**: First user waits 14-40s. Next users get instant responses. After every 3 hits, a new variation is generated. Users with the same birth data see different fortunes.
+**Result**: First user waits 14-40s. All subsequent users get instant responses (~5ms). After every 3 hits, a new variation is generated in the background — no user ever waits. Users with the same birth data see different fortunes.
 
 ### Chatbot Greeting Messages
 

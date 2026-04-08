@@ -38,25 +38,22 @@ function mockOpenAICall(prompt) {
 const { GrowingPoolCache } = require('../src/index');
 const { MemoryAdapter } = require('../src/adapters/memory');
 
-const cache = new GrowingPoolCache(new MemoryAdapter(), {
-  onGrowth: (key) => console.log(`[Pool Growing] ${key}`),
-});
-
-// In production, use OpenAI:
-// const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-async function generateFortune(category) {
-  // In production:
-  // const response = await openai.chat.completions.create({
-  //   model: 'gpt-4',
-  //   messages: [{ role: 'user', content: `Generate a fortune for category: ${category}` }],
-  // });
-  // return response.choices[0].message.content;
-
-  // Simulate 2-second AI call
+async function generateAndStore(category) {
+  const cacheKey = `fortune:${category}`;
+  // Simulate 2-second AI call (in production, use OpenAI)
   await new Promise((r) => setTimeout(r, 100));
-  return mockOpenAICall(category);
+  const fortune = mockOpenAICall(category);
+  await cache.set(cacheKey, fortune, { poolTarget: 3, ttl: 86400 });
+  console.log(`[Pool Growing] Generated new response for ${cacheKey}`);
 }
+
+const cache = new GrowingPoolCache(new MemoryAdapter(), {
+  // onGrowth fires when pool needs to grow — generate new content async
+  onGrowth: (key) => {
+    const category = key.replace('fortune:', '');
+    generateAndStore(category); // fire-and-forget, user already got a response
+  },
+});
 
 // --- Route handler ---
 
@@ -67,15 +64,13 @@ async function handleFortune(category) {
   const cached = await cache.get(cacheKey);
 
   if (cached !== null) {
-    // Cache hit (~5ms)
+    // Cache hit (~5ms) — always returns a response, even when growth is triggered
     return { source: 'cache', fortune: cached };
   }
 
-  // Cache miss or growth trigger — generate new AI response
-  const fortune = await generateFortune(category);
-
-  // Store with pool mode: grow pool every 3 hits
-  await cache.set(cacheKey, fortune, { poolTarget: 3, ttl: 86400 });
+  // Cache miss (first request for this key) — generate and store
+  await generateAndStore(category);
+  const fortune = await cache.get(cacheKey);
 
   return { source: 'ai', fortune };
 }
