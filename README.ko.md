@@ -19,32 +19,32 @@
 
 ## 작동 원리
 
+<img src="https://mermaid.ink/img/Zmxvd2NoYXJ0IFRECiAgICBBWyLsmpTssq06IGtleT0nZm9ydHVuZTpsb3ZlJyJdIC0tPiBCe-y6kOyLnCDsobTsnqw_fQogICAgQiAtLT58Tm98IENbIkFJIEFQSSDtmLjstpwgfjE0LTQw7LSIIl0KICAgIEMgLS0-IERb7J2R64u1IEHrpbwg7ZKA7JeQIOyggOyepV0KICAgIEQgLS0-IEVbQSDrsJjtmZhdCiAgICBCIC0tPnxZZXN8IEZ77ZKAIOuqqOuTnD99CiAgICBGIC0tPnxTaW1wbGV8IEdbIuy6kOyLnOuQnCDqsJIg67CY7ZmYIH41bXMiXQogICAgRiAtLT58UG9vbHwgSHsi7LWc7IugIO2VreuqqSDtnojtirggPj0gTj8ifQogICAgSCAtLT58Tm98IElbIu2SgOyXkOyEnCDrnpzrjaQg7ISg7YOdIH41bXMiXQogICAgSSAtLT4gSlvrnpzrjaQg7J2R64u1IOuwmO2ZmF0KICAgIEggLS0-fFllc3wgS1si7ZKA7JeQ7IScIOuenOuNpCDshKDtg50gfjVtcyJdCiAgICBLIC0tPiBMW-ydkeuLtSDrsJjtmZhdCiAgICBLIC0tPiBNWyJvbkdyb3d0aCDsvZzrsLEg67mE64-Z6riwIO2KuOumrOqxsCJdCiAgICBNIC0tPiBOW-2YuOy2nOyekOqwgCDsg4gg7J2R64u1IOyDneyEsV0KICAgIE4gLS0-IE9b7J2R64u1IELqsIAg7ZKA7JeQIOy2lOqwgF0KICAgIE8gLS0-IFBbIu2SgCDtgazquLA6IDIiXQogICAgUCAtLT4gUVsi7Zal7ZuEIOyalOyyrTog656c642k7Jy866GcIEEg65iQ64qUIEIiXQogICAgUSAtLT4gUlsiQuqwgCBOIO2eiO2KuCDrj4Tri6wuLi4iXQogICAgUiAtLT4gU1siQyDsg53shLEsIO2SgCDtgazquLA6IDMiXQogICAgUyAtLT4gVFvshLHsnqXsnbQg7J6Q7Jew7Iqk65-96rKMIOqwkOyGjV0=" alt="작동 원리 - 플로우 다이어그램" />
+
+<!-- mermaid source:
 ```mermaid
 flowchart TD
     A["요청: key='fortune:love'"] --> B{캐시 존재?}
     B -->|No| C["AI API 호출 ~14-40초"]
     C --> D[응답 A를 풀에 저장]
     D --> E[A 반환]
-    
     B -->|Yes| F{풀 모드?}
     F -->|Simple| G["캐시된 값 반환 ~5ms"]
     F -->|Pool| H{"최신 항목 히트 >= N?"}
-    
     H -->|No| I["풀에서 랜덤 선택 ~5ms"]
     I --> J[랜덤 응답 반환]
-    
     H -->|Yes| K["풀에서 랜덤 선택 ~5ms"]
     K --> L[응답 반환]
     K --> M["onGrowth 콜백 비동기 트리거"]
     M --> N[호출자가 새 응답 생성]
     N --> O[응답 B가 풀에 추가]
     O --> P["풀 크기: 2"]
-    
     P --> Q["향후 요청: 랜덤으로 A 또는 B"]
     Q --> R["B가 N 히트 도달..."]
     R --> S["C 생성, 풀 크기: 3"]
     S --> T[성장이 자연스럽게 감속]
 ```
+-->
 
 ### 성장 사이클
 
@@ -73,6 +73,9 @@ flowchart TD
 
 #### 풀 성장 vs 요청 수 (poolTarget=3)
 
+<img src="https://mermaid.ink/img/eHljaGFydC1iZXRhCiAgICB0aXRsZSAi7JqU7LKtIOyImCDrjIDruYQg7ZKAIO2BrOq4sCDshLHsnqUiCiAgICB4LWF4aXMgIuy0nSDsmpTssq0g7IiYIiBbMCwgMywgOSwgMTgsIDMwLCA0NSwgNjMsIDg0LCAxMDgsIDEzNV0KICAgIHktYXhpcyAi7ZKAIO2BrOq4sCIgMCAtLT4gMTIKICAgIGxpbmUgWzAsIDEsIDIsIDMsIDQsIDUsIDYsIDcsIDgsIDld" alt="풀 성장 vs 요청 수" />
+
+<!-- mermaid source:
 ```mermaid
 xychart-beta
     title "요청 수 대비 풀 크기 성장"
@@ -80,11 +83,15 @@ xychart-beta
     y-axis "풀 크기" 0 --> 12
     line [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 ```
+-->
 
 > 풀 성장은 **O(√n)** 패턴 — 초기에 빠르게 성장, 이후 점진적 감속. 별도 설정 불필요.
 
 #### 누적 AI 호출 vs 처리된 요청 수
 
+<img src="https://mermaid.ink/img/eHljaGFydC1iZXRhCiAgICB0aXRsZSAi7Iuc6rCE7JeQIOuUsOuluCBBSSBBUEkg7Zi47LacIOygiOqwkCIKICAgIHgtYXhpcyAi7LSdIOyymOumrCDsmpTssq0g7IiYIiBbMCwgMTAsIDMwLCA2MCwgMTAwLCAyMDAsIDUwMCwgMTAwMF0KICAgIHktYXhpcyAiQUkgQVBJIO2YuOy2nCDtmp_siJgiIDAgLS0-IDMwCiAgICBsaW5lICJHcm93aW5nIFBvb2wiIFswLCAzLCA1LCA4LCAxMSwgMTUsIDIyLCAzMF0KICAgIGxpbmUgIuy6kOyLnCDsl4bsnYwiIFswLCAxMCwgMzAsIDYwLCAxMDAsIDIwMCwgNTAwLCAxMDAwXQ==" alt="AI API 호출 절감" />
+
+<!-- mermaid source:
 ```mermaid
 xychart-beta
     title "시간에 따른 AI API 호출 절감"
@@ -93,11 +100,15 @@ xychart-beta
     line "Growing Pool" [0, 3, 5, 8, 11, 15, 22, 30]
     line "캐시 없음" [0, 10, 30, 60, 100, 200, 500, 1000]
 ```
+-->
 
 > 1,000건 요청 시, Growing Pool Cache는 **~30회 AI 호출** vs 캐시 없으면 1,000회. 다양한 응답을 유지하면서 **97% 비용 절감**.
 
 #### 캐시 히트율 추이
 
+<img src="https://mermaid.ink/img/eHljaGFydC1iZXRhCiAgICB0aXRsZSAi7LqQ7IucIO2eiO2KuOycqCAoJSkiCiAgICB4LWF4aXMgIuy0nSDsmpTssq0g7IiYIiBbMSwgNSwgMTAsIDIwLCA1MCwgMTAwLCA1MDAsIDEwMDBdCiAgICB5LWF4aXMgIu2eiO2KuOycqCAlIiAwIC0tPiAxMDAKICAgIGxpbmUgWzAsIDYwLCA4MCwgOTAsIDk0LCA5NywgOTksIDk5XQ==" alt="캐시 히트율 추이" />
+
+<!-- mermaid source:
 ```mermaid
 xychart-beta
     title "캐시 히트율 (%)"
@@ -105,16 +116,21 @@ xychart-beta
     y-axis "히트율 %" 0 --> 100
     line [0, 60, 80, 90, 94, 97, 99, 99]
 ```
+-->
 
 > 히트율은 **~99%**에 수렴. 모든 히트는 **~5ms**, AI 생성은 **14-40초**.
 
 #### 응답 지연 분포
 
+<img src="https://mermaid.ink/img/cGllIHRpdGxlIOydkeuLtSDsp4Dsl7Ag67aE7Y-sICgxMDDqsbQg7JqU7LKtIO2bhCwgcG9vbFRhcmdldD0zKQogICAgIn41bXMgKOy6kOyLnCDtnojtirgpIiA6IDk3CiAgICAiMTQtNDBzIChBSSDsg53shLEpIiA6IDM=" alt="응답 지연 분포" />
+
+<!-- mermaid source:
 ```mermaid
 pie title 응답 지연 분포 (100건 요청 후, poolTarget=3)
     "~5ms (캐시 히트)" : 97
     "14-40s (AI 생성)" : 3
 ```
+-->
 
 ## 전통적 캐시 vs Growing Pool Cache
 
