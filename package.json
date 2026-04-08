@@ -1,7 +1,7 @@
 {
   "name": "growing-pool-cache",
-  "version": "1.0.2",
-  "description": "A self-growing cache pool for AI-generated content — balances cost savings with response diversity",
+  "version": "1.0.3",
+  "description": "A self-growing cache pool for AI-generated content — balances cost savings with response diversity. 97% API cost reduction.",
   "main": "src/index.js",
   "types": "src/types.d.ts",
   "scripts": {
@@ -16,7 +16,14 @@
     "cost-optimization",
     "growing-cache",
     "caching-strategy",
-    "ai-response"
+    "ai-response",
+    "content-pool",
+    "api-cost-reduction",
+    "response-diversity",
+    "token-savings",
+    "openai",
+    "claude",
+    "chatgpt"
   ],
   "author": "NSKit <nskit@nskit.io>",
   "license": "MIT",
@@ -27,7 +34,11 @@
   "bugs": {
     "url": "https://github.com/nskit-io/growing-pool-cache/issues"
   },
-  "homepage": "https://github.com/nskit-io/growing-pool-cache#readme",
+  "homepage": "https://nskit.io",
+  "funding": {
+    "type": "individual",
+    "url": "https://nskit.io"
+  },
   "engines": {
     "node": ">=14.0.0"
   },
