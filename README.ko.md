@@ -5,7 +5,9 @@
 [![npm version](https://img.shields.io/npm/v/growing-pool-cache.svg)](https://www.npmjs.com/package/growing-pool-cache)
 [![license](https://img.shields.io/npm/l/growing-pool-cache.svg)](https://github.com/nskit-io/growing-pool-cache/blob/main/LICENSE)
 
-[English](./README.md)
+[🇬🇧 English](./README.md) · [🇯🇵 日本語](./README.ja.md) · [🇨🇳 中文](./README.zh.md)
+
+> [**NSKit**](https://github.com/nskit-io/nskit-io) 비용 효율 원천 기술 — *갇혀 있어서 무한 조합*. NSKit 프로덕션 서비스의 AI 콘텐츠 캐시 레이어를 책임지며, 응답 다양성을 지키면서 AI API 비용을 약 97% 절감합니다.
 
 ---
 

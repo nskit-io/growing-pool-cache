@@ -5,7 +5,9 @@
 [![npm version](https://img.shields.io/npm/v/growing-pool-cache.svg)](https://www.npmjs.com/package/growing-pool-cache)
 [![license](https://img.shields.io/npm/l/growing-pool-cache.svg)](https://github.com/nskit-io/growing-pool-cache/blob/main/LICENSE)
 
-[한국어](./README.ko.md)
+[🇰🇷 한국어](./README.ko.md) · [🇯🇵 日本語](./README.ja.md) · [🇨🇳 中文](./README.zh.md)
+
+> Cost-efficiency primitive from [**NSKit**](https://github.com/nskit-io/nskit-io) — *bound by structure, free to combine.* Powers the AI-content cache layer behind NSKit's production services, cutting AI API bills by ~97% while preserving response diversity.
 
 ---
 
